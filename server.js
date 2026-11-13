@@ -9,13 +9,16 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/db', express.static(path.join(__dirname, 'db')));
 
+// ============================
+// CONTRASENA DE OWNER
+// ============================
+const OWNER_PASSWORD = "𐚁ᴅᴀᴍɪᴀɴᴊs-ᴏғᴄ";
+const LIMITE_DEFAULT = 20;
+
 fs.mkdirSync('db/imagenes', { recursive: true });
 fs.mkdirSync('db/videos', { recursive: true });
 if (!fs.existsSync('db/tokens.json')) fs.writeFileSync('db/tokens.json', '[]');
 if (!fs.existsSync('db/uso.json')) fs.writeFileSync('db/uso.json', '{}');
-
-const OWNER_PASSWORD = process.env.OWNER_PASSWORD || 'CAMBIAR_EN_RENDER';
-const LIMITE_DEFAULT = 20;
 
 function hoy() { return new Date().toISOString().slice(0, 10); }
 function cargarTokens() { return JSON.parse(fs.readFileSync('db/tokens.json', 'utf8')); }
@@ -23,7 +26,6 @@ function guardarTokens(t) { fs.writeFileSync('db/tokens.json', JSON.stringify(t,
 function cargarUso() { return JSON.parse(fs.readFileSync('db/uso.json', 'utf8')); }
 function guardarUso(u) { fs.writeFileSync('db/uso.json', JSON.stringify(u, null, 2)); }
 
-// Reseteo diario a las 00:00
 function verificarReseteo(token) {
   let uso = cargarUso();
   if (uso[token.key] && uso[token.key].fecha !== hoy()) {
@@ -41,7 +43,6 @@ function esOwner(req) {
   return req.headers['x-owner-pass'] === OWNER_PASSWORD;
 }
 
-// --- OWNER: crear token ---
 app.post('/api/owner/crear-token', (req, res) => {
   if (!esOwner(req)) return res.status(403).json({ error: 'No autorizado' });
   const { nombre, limite } = req.body;
@@ -59,7 +60,6 @@ app.post('/api/owner/crear-token', (req, res) => {
   res.json({ ok: true, token: nuevo });
 });
 
-// --- OWNER: ver tokens ---
 app.get('/api/owner/tokens', (req, res) => {
   if (!esOwner(req)) return res.status(403).json({ error: 'No autorizado' });
   const tokens = cargarTokens();
@@ -72,7 +72,6 @@ app.get('/api/owner/tokens', (req, res) => {
   res.json(lista);
 });
 
-// --- OWNER: eliminar token ---
 app.post('/api/owner/eliminar-token', (req, res) => {
   if (!esOwner(req)) return res.status(403).json({ error: 'No autorizado' });
   let tokens = cargarTokens();
@@ -81,7 +80,6 @@ app.post('/api/owner/eliminar-token', (req, res) => {
   res.json({ ok: true });
 });
 
-// --- USUARIO: verificar su token y ver cuanto le queda ---
 app.post('/api/verificar-token', (req, res) => {
   const { key } = req.body;
   const tokens = cargarTokens();
@@ -102,7 +100,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
-// --- SUBIR con token + limite ---
 app.post('/subir', upload.single('archivo'), (req, res) => {
   const key = req.headers['x-token'] || req.body.token;
   const tokens = cargarTokens();
@@ -118,7 +115,6 @@ app.post('/subir', upload.single('archivo'), (req, res) => {
   }
   if (!req.file) return res.json({ error: 'No hay archivo' });
 
-  // Sumar uso
   let todosUso = cargarUso();
   todosUso[token.key].usados += 1;
   guardarUso(todosUso);
@@ -130,8 +126,8 @@ app.post('/subir', upload.single('archivo'), (req, res) => {
 });
 
 app.get('/lista', (req, res) => {
-  const imgs = fs.readdirSync('db/imagenes').map(f => `/db/imagenes/${f}`);
-  const vids = fs.readdirSync('db/videos').map(f => `/db/videos/${f}`);
+  const imgs = fs.readdirSync('db/imagenes').filter(f => f !== '.gitkeep').map(f => `/db/imagenes/${f}`);
+  const vids = fs.readdirSync('db/videos').filter(f => f !== '.gitkeep').map(f => `/db/videos/${f}`);
   res.json({ imagenes: imgs, videos: vids });
 });
 
