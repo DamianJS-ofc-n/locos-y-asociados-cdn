@@ -8,7 +8,6 @@ app.use(express.json());
 app.use(express.static('public'));
 app.use('/db', express.static(path.join(__dirname, 'db')));
 
-// CLAVE OWNER SIMPLE, SIN SIMBOLOS RAROS - ESTA ES LA QUE VAS A USAR
 const OWNER_PASSWORD = "damianjs-ofc-2026";
 
 fs.mkdirSync('db/imagenes', { recursive: true });
@@ -30,12 +29,13 @@ function verificarReseteo(token) {
   if (!uso[token.key] || uso[token.key].fecha !== hoy()) { uso[token.key] = { fecha: hoy(), usados: 0 }; guardarUso(uso); }
   return uso[token.key];
 }
-function esOwner(req) {
-  // Ahora viene por BODY, no por header, para que no falle con simbolos raros
-  return req.body && req.body.ownerPass === OWNER_PASSWORD;
+function esOwner(req) { return req.body && req.body.ownerPass === OWNER_PASSWORD; }
+
+// CODIGO CORTO - 6 caracteres, tipo aB3x9Z
+function codigoCorto() {
+  return crypto.randomBytes(4).toString('base64url').replace(/[^a-zA-Z0-9]/g, '').slice(0, 6) || Math.random().toString(36).slice(2, 8);
 }
 
-// 1. AUTO REGISTRO - EL USUARIO ENTRA Y YA TIENE SU TOKEN
 app.post('/api/auto-registro', (req, res) => {
   const nombre = req.body.nombre || 'Usuario';
   const tokens = cargarTokens();
@@ -44,7 +44,6 @@ app.post('/api/auto-registro', (req, res) => {
   res.json({ ok: true, token: nuevo });
 });
 
-// 2. VERIFICAR MI TOKEN
 app.post('/api/verificar-token', (req, res) => {
   const { key } = req.body;
   const tokens = cargarTokens();
@@ -55,7 +54,6 @@ app.post('/api/verificar-token', (req, res) => {
   res.json({ valido: true, nombre: token.nombre, limite: limiteTotal, usados: u.usados, restantes: limiteTotal - u.usados, key: token.key });
 });
 
-// 3. CANJEAR CODIGO PARA AUMENTAR LIMITE
 app.post('/api/canjear-codigo', (req, res) => {
   const { key, codigo } = req.body;
   if (codigo === OWNER_PASSWORD) return res.json({ esOwner: true });
@@ -72,7 +70,6 @@ app.post('/api/canjear-codigo', (req, res) => {
   res.json({ ok: true, extra: c.extra, limite: limiteTotal });
 });
 
-// 4. OWNER - CREAR CODIGO DE AUMENTO
 app.post('/api/owner/crear-codigo', (req, res) => {
   if (!esOwner(req)) return res.status(403).json({ error: 'No autorizado' });
   const codigos = cargarCodigos();
@@ -93,9 +90,14 @@ app.post('/api/owner/tokens', (req, res) => {
   res.json(lista);
 });
 
+// ACA ESTA EL CAMBIO DEL LINK CORTO
 const storage = multer.diskStorage({
   destination: (req, file, cb) => { if (file.mimetype.startsWith('video/')) cb(null, 'db/videos'); else cb(null, 'db/imagenes'); },
-  filename: (req, file, cb) => { cb(null, Date.now() + '-' + file.originalname.replace(/\s/g, '_')); }
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    const corto = codigoCorto();
+    cb(null, corto + ext);
+  }
 });
 const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } });
 
@@ -111,13 +113,24 @@ app.post('/subir', upload.single('archivo'), (req, res) => {
   let todosUso = cargarUso(); todosUso[token.key].usados += 1; guardarUso(todosUso);
   const esVideo = req.file.mimetype.startsWith('video/');
   const carpeta = esVideo ? 'videos' : 'imagenes';
-  const link = `${req.protocol}://${req.get('host')}/db/${carpeta}/${req.file.filename}`;
+  // LINK CORTO: /i/ + codigo
+  const link = `${req.protocol}://${req.get('host')}/i/${req.file.filename}`;
   res.json({ link, tipo: esVideo ? 'video' : 'imagen', restantes: limiteTotal - todosUso[token.key].usados, limite: limiteTotal });
 });
 
+// RUTA CORTA /i/ -> busca en imagenes o videos
+app.get('/i/:archivo', (req, res) => {
+  const nombre = req.params.archivo;
+  const rutaImg = path.join(__dirname, 'db/imagenes', nombre);
+  const rutaVid = path.join(__dirname, 'db/videos', nombre);
+  if (fs.existsSync(rutaImg)) return res.sendFile(rutaImg);
+  if (fs.existsSync(rutaVid)) return res.sendFile(rutaVid);
+  res.status(404).send('No encontrado');
+});
+
 app.get('/lista', (req, res) => {
-  const imgs = fs.readdirSync('db/imagenes').filter(f => f !== '.gitkeep').map(f => `/db/imagenes/${f}`);
-  const vids = fs.readdirSync('db/videos').filter(f => f !== '.gitkeep').map(f => `/db/videos/${f}`);
+  const imgs = fs.readdirSync('db/imagenes').filter(f => f !== '.gitkeep').map(f => `/i/${f}`);
+  const vids = fs.readdirSync('db/videos').filter(f => f !== '.gitkeep').map(f => `/i/${f}`);
   res.json({ imagenes: imgs, videos: vids });
 });
 app.listen(process.env.PORT || 10000, () => console.log('LOCOS CDN ON'));
