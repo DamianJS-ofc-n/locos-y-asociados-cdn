@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LOCOS CDN</title>
+<style>
+*{box-sizing:border-box;font-family:Arial,sans-serif}
+body{background:#08030f;color:#fff;text-align:center;padding:16px;margin:0}
+.top{max-width:520px;margin:0 auto;display:flex;justify-content:space-between;align-items:center}
+.perfil-btn{display:flex;align-items:center;gap:8px;background:#140826;border:1px solid #7b2ff7;border-radius:999px;padding:5px 12px 5px 5px;color:#fff;cursor:pointer}
+.perfil-btn img{width:32px;height:32px;border-radius:50%;object-fit:cover;background:#c084fc}
+.box{border:2px dashed #7b2ff7;border-radius:20px;padding:24px;max-width:520px;margin:16px auto;background:#140826}
+input{width:100%;padding:12px;margin:8px 0;border-radius:10px;border:1px solid #3a1a5e;background:#08030f;color:#fff}
+button{background:#7b2ff7;color:#fff;border:none;padding:13px 22px;border-radius:12px;font-weight:900;cursor:pointer;margin:5px}
+button.sec{background:transparent;border:1px solid #7b2ff7;color:#c084fc}
+img,video{max-width:100%;border-radius:15px;margin-top:12px}
+.link{background:#08030f;border:1px solid #7b2ff7;padding:12px;border-radius:10px;word-break:break-all;margin-top:12px;font-size:13px}
+.barra{height:10px;background:#08030f;border-radius:999px;overflow:hidden;margin:10px 0}
+.barra div{height:100%;background:#c084fc}
+.galeria{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;max-width:700px;margin:20px auto}
+.galeria img,.galeria video{width:130px;height:130px;object-fit:cover;margin:0}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:flex-end;justify-content:center;padding:14px}
+.modal.open{display:flex}
+.modal-box{width:100%;max-width:480px;background:#140826;border:1px solid #7b2ff7;border-radius:20px;padding:20px;text-align:left}
+.foto-prev{width:80px;height:80px;border-radius:50%;background:#2a0a4a;border:2px solid #c084fc;display:flex;align-items:center;justify-content:center;overflow:hidden;margin:0 auto 12px;font-size:28px;font-weight:900}
+.foto-prev img{width:100%;height:100%;object-fit:cover;margin:0}
+</style>
+</head><body>
+
+<script>
+// ============================
+// CONTRASENA DE OWNER
+// ============================
+const OWNER_PASSWORD = "𐚁ᴅᴀᴍɪᴀɴᴊs-ᴏғᴄ";
+</script>
+
+<div class="top">
+<h2 style="margin:0">LOCOS CDN</h2>
+<button class="perfil-btn" onclick="abrirPerfil()"><span id="miniFoto"></span><span id="miniNombre">Mi Perfil</span></button>
+</div>
+<p style="color:#b9a8d8">Subi foto o video y usa tu link en cualquier proyecto</p>
+
+<div class="box" style="text-align:left">
+<b>Tu Token</b>
+<input id="tokenInput" placeholder="Pega tu token locos_...">
+<button onclick="verificar()" class="sec">Verificar Token</button>
+<p id="infoToken" style="color:#c084fc;font-weight:700"></p>
+<div class="barra"><div id="barraUso" style="width:0%"></div></div>
+<p id="textoUso" style="font-size:13px;color:#a78fc4;margin:0">Sin token verificado</p>
+</div>
+
+<div class="box">
+<input type="file" id="file" accept="image/*,video/*"><br><br>
+<button onclick="subir()">SUBIR ARCHIVO</button>
+<p id="estado"></p>
+<img id="previewImg" style="display:none">
+<video id="previewVid" controls style="display:none"></video>
+<div class="link" id="link" style="display:none"></div>
+<button id="copiar" style="display:none" onclick="copiar()">COPIAR LINK</button>
+</div>
+
+<div style="max-width:520px;margin:0 auto">
+<button class="sec" onclick="abrirOwner()">Panel Owner</button>
+</div>
+
+<div class="box" id="panelOwner" style="display:none;text-align:left">
+<h3>Panel Owner</h3>
+<input type="password" id="passOwner" placeholder="Contrasena secreta de owner">
+<button onclick="entrarOwner()">Entrar</button>
+<div id="zonaOwner" style="display:none">
+<input id="nombreToken" placeholder="Nombre - Ej: Dami, Amigo1">
+<input id="limiteToken" type="number" value="20" placeholder="Limite por dia">
+<button onclick="crearToken()">Crear Token</button>
+<p id="msgOwner"></p>
+<div id="listaTokens"></div>
+</div>
+</div>
+
+<h3>Archivos subidos</h3>
+<div class="galeria" id="galeria"></div>
+
+<div class="modal" id="modalPerfil" onclick="if(event.target===this) cerrarPerfil()">
+<div class="modal-box">
+<h3 style="text-align:center;margin:0">Tu Perfil</h3>
+<p style="text-align:center;color:#a78fc4;font-size:13px">Tu nombre y foto se guardan solo en tu dispositivo</p>
+<div class="foto-prev" id="fotoPrev">+</div>
+<label style="display:block;text-align:center;background:#08030f;border:1px dashed #7b2ff7;padding:11px;border-radius:10px;cursor:pointer;color:#c084fc;font-weight:800" for="fotoInput">Cambiar foto</label>
+<input type="file" id="fotoInput" accept="image/*" style="display:none" onchange="cambiarFoto(event)">
+<input id="nombrePerfil" placeholder="Tu nombre">
+<input id="tokenPerfil" placeholder="Tu token locos_...">
+<button style="width:100%" onclick="guardarPerfil()">GUARDAR PERFIL</button>
+<button style="width:100%" class="sec" onclick="cerrarPerfil()">Cerrar</button>
+</div></div>
+
+<script>
+let perfil = JSON.parse(localStorage.getItem('locos_cdn_perfil') || '{"nombre":"","foto":"","token":""}');
+let ultimo = "";
+let ownerLogueado = false;
+
+function pintarPerfil(){
+  document.getElementById('miniNombre').innerText = perfil.nombre || 'Mi Perfil';
+  document.getElementById('miniFoto').innerHTML = perfil.foto ? `<img src="${perfil.foto}">` : (perfil.nombre ? perfil.nombre.charAt(0).toUpperCase() : '+');
+  document.getElementById('nombrePerfil').value = perfil.nombre || '';
+  document.getElementById('tokenPerfil').value = perfil.token || '';
+  document.getElementById('tokenInput').value = perfil.token || '';
+  document.getElementById('fotoPrev').innerHTML = perfil.foto ? `<img src="${perfil.foto}">` : (perfil.nombre ? perfil.nombre.charAt(0).toUpperCase() : '+');
+}
+function abrirPerfil(){ pintarPerfil(); document.getElementById('modalPerfil').classList.add('open'); }
+function cerrarPerfil(){ document.getElementById('modalPerfil').classList.remove('open'); }
+let fotoTemp = '';
+function cambiarFoto(e){
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader(); r.onload = () => { fotoTemp = r.result; document.getElementById('fotoPrev').innerHTML = `<img src="${fotoTemp}">`; }; r.readAsDataURL(f);
+}
+function guardarPerfil(){
+  const n = document.getElementById('nombrePerfil').value.trim();
+  const t = document.getElementById('tokenPerfil').value.trim();
+  if(!n) return alert('Pone tu nombre');
+  perfil = { nombre: n, foto: fotoTemp || perfil.foto || '', token: t };
+  localStorage.setItem('locos_cdn_perfil', JSON.stringify(perfil));
+  pintarPerfil(); cerrarPerfil(); verificar();
+}
+function abrirOwner(){
+  const box = document.getElementById('panelOwner');
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  box.scrollIntoView({ behavior: 'smooth' });
+}
+async function entrarOwner(){
+  const pass = document.getElementById('passOwner').value;
+  if(pass !== OWNER_PASSWORD) return alert('Contrasena incorrecta');
+  ownerLogueado = true;
+  document.getElementById('zonaOwner').style.display = 'block';
+  cargarTokensOwner();
+}
+async function cargarTokensOwner(){
+  const r = await fetch('/api/owner/tokens', { headers:{ 'x-owner-pass': OWNER_PASSWORD } });
+  const d = await r.json();
+  document.getElementById('listaTokens').innerHTML = d.map(t => `<div style="border:1px solid #2a1a5e;padding:12px;border-radius:12px;margin-top:10px"><b>${t.nombre}</b><p>Usados: ${t.usados} / ${t.limite} - Restantes: ${t.restantes}</p><div style="word-break:break-all;background:#08030f;padding:10px;border-radius:8px;border:1px solid #7b2ff7">${t.key}</div><button style="margin-top:10px;background:#ff4444" onclick="eliminarToken('${t.key}')">Eliminar</button></div>`).join('') || 'Sin tokens';
+}
+async function crearToken(){
+  if(!ownerLogueado) return alert('Entra con tu contrasena primero');
+  const nombre = document.getElementById('nombreToken').value.trim();
+  const limite = document.getElementById('limiteToken').value;
+  if(!nombre) return alert('Pone un nombre');
+  const r = await fetch('/api/owner/crear-token', { method:'POST', headers:{ 'Content-Type':'application/json', 'x-owner-pass': OWNER_PASSWORD }, body: JSON.stringify({ nombre, limite }) });
+  const d = await r.json();
+  document.getElementById('msgOwner').innerText = 'Token creado: ' + d.token.key;
+  cargarTokensOwner();
+}
+async function eliminarToken(key){
+  if(!confirm('Eliminar este token?')) return;
+  await fetch('/api/owner/eliminar-token', { method:'POST', headers:{ 'Content-Type':'application/json', 'x-owner-pass': OWNER_PASSWORD }, body: JSON.stringify({ key }) });
+  cargarTokensOwner();
+}
+async function verificar(){
+  const key = document.getElementById('tokenInput').value.trim();
+  if(!key) return alert('Pega tu token');
+  const r = await fetch('/api/verificar-token', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key}) });
+  const d = await r.json();
+  if(!d.valido) return document.getElementById('infoToken').innerText = 'Token invalido';
+  document.getElementById('infoToken').innerText = 'Token de ' + d.nombre + ' - Valido';
+  document.getElementById('textoUso').innerText = 'Usados hoy: ' + d.usados + ' / ' + d.limite + ' - Restantes: ' + d.restantes + ' - Se recarga a las 00:00';
+  document.getElementById('barraUso').style.width = (d.usados / d.limite * 100) + '%';
+}
+async function subir(){
+  const key = document.getElementById('tokenInput').value.trim();
+  if(!key) return alert('Primero pone tu token');
+  const f = document.getElementById('file').files[0];
+  if(!f) return alert('Elegi un archivo');
+  document.getElementById('estado').innerText = 'Subiendo...';
+  const fd = new FormData(); fd.append('archivo', f);
+  const r = await fetch('/subir', { method:'POST', headers:{ 'x-token': key }, body: fd });
+  const d = await r.json();
+  if(d.error) return document.getElementById('estado').innerText = d.error;
+  ultimo = d.link;
+  document.getElementById('estado').innerText = 'Listo - Guardado. Te quedan ' + d.restantes + ' de ' + d.limite + ' hoy';
+  document.getElementById('link').innerText = ultimo;
+  document.getElementById('link').style.display = 'block';
+  document.getElementById('copiar').style.display = 'inline-block';
+  if(d.tipo === 'video'){ document.getElementById('previewVid').src = ultimo; document.getElementById('previewVid').style.display = 'block'; document.getElementById('previewImg').style.display = 'none'; }
+  else { document.getElementById('previewImg').src = ultimo; document.getElementById('previewImg').style.display = 'block'; document.getElementById('previewVid').style.display = 'none'; }
+  verificar(); cargarGaleria();
+}
+function copiar(){ navigator.clipboard.writeText(ultimo); alert('Link copiado'); }
+async function cargarGaleria(){
+  const r = await fetch('/lista'); const d = await r.json();
+  let html = '';
+  d.imagenes.forEach(u => html += `<img src="${u}" onclick="navigator.clipboard.writeText(location.origin+'${u}');alert('Link copiado')">`);
+  d.videos.forEach(u => html += `<video src="${u}"></video>`);
+  document.getElementById('galeria').innerHTML = html || 'Todavia no hay archivos';
+}
+pintarPerfil(); cargarGaleria();
+if(perfil.token) verificar();
+if(!perfil.nombre) setTimeout(()=>abrirPerfil(), 600);
+</script></body></html>
